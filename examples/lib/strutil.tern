@@ -1,0 +1,7 @@
+import "geometry"    # modules can import other modules (cached, loaded once)
+
+fn shout(s) { return s.upper() + "!" }
+fn title(s) {
+    return " ".join(map(fn(w) => w.slice(0, 1).upper() + w.slice(1), s.split(" ")))
+}
+let shapes_seen = geometry.PI > 3

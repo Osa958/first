@@ -1,0 +1,97 @@
+# A bank account class hierarchy with inheritance, super calls and
+# custom exceptions.
+
+class InsufficientFunds < Error {
+    fn init(account, amount) {
+        super.init("cannot withdraw " + str(amount) + " from " + account.owner +
+                   " (balance " + str(account.balance) + ")")
+        self.amount = amount
+    }
+}
+
+class Account {
+    fn init(owner, balance) {
+        self.owner = owner
+        self.balance = balance
+        self.history = []
+    }
+    fn deposit(amount) {
+        if amount <= 0 { throw ValueError("deposit must be positive") }
+        self.balance += amount
+        self.history.push("deposit " + str(amount))
+        return self
+    }
+    fn can_withdraw(amount) { return amount <= self.balance }
+    fn withdraw(amount) {
+        if not self.can_withdraw(amount) { throw InsufficientFunds(self, amount) }
+        self.balance -= amount
+        self.history.push("withdraw " + str(amount))
+        return self
+    }
+    fn kind() { return "Account" }
+    fn to_string() {
+        return "{}[{}: {}]".format(self.kind(), self.owner, self.balance)
+    }
+}
+
+class Savings < Account {
+    fn init(owner, balance, rate) {
+        super.init(owner, balance)
+        self.rate = rate
+    }
+    fn add_interest() {
+        let interest = round(self.balance * self.rate, 2)
+        self.deposit(interest)
+        return interest
+    }
+    fn kind() { return "Savings" }
+}
+
+class Checking < Account {
+    fn init(owner, balance, overdraft) {
+        super.init(owner, balance)
+        self.overdraft = overdraft
+    }
+    # override: may go negative down to -overdraft
+    fn can_withdraw(amount) { return amount <= self.balance + self.overdraft }
+    fn kind() { return "Checking" }
+}
+
+class Premium < Checking {
+    fn init(owner, balance) { super.init(owner, balance, 1000) }
+    fn withdraw(amount) {
+        # premium withdrawals are free of fees but logged twice
+        super.withdraw(amount)
+        self.history.push("premium audit")
+        return self
+    }
+    fn kind() { return "Premium" }
+}
+
+fn transfer(from, to, amount) {
+    try {
+        from.withdraw(amount)
+        to.deposit(amount)
+        print("transferred", amount, "from", from.owner, "to", to.owner)
+    } catch e {
+        print("transfer failed:", e.message)
+    }
+}
+
+let alice = Savings("alice", 100, 0.05)
+let bob = Checking("bob", 50, 100)
+let carol = Premium("carol", 0)
+
+transfer(alice, bob, 30)
+transfer(bob, carol, 170)
+transfer(bob, carol, 1)
+print("interest paid to alice:", alice.add_interest())
+carol.withdraw(500)
+
+let accounts = [alice, bob, carol]
+for acct in accounts { print(acct) }
+print("total:", reduce(fn(sum, a) => sum + a.balance, accounts, 0))
+print("carol history:", carol.history)
+
+try { alice.deposit(-5) } catch e { print(type(e) + ":", e.message) }
+print("is carol a Checking?", isinstance(carol, Checking), "a Savings?", isinstance(carol, Savings))

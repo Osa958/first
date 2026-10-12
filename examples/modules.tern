@@ -1,0 +1,14 @@
+# Demonstrates the module system.
+import "lib/geometry"
+import "lib/strutil" as su
+
+let shapes = [geometry.Circle(1), geometry.Rect(2, 3)]
+for s in shapes { print(s.describe()) }
+print("total:", round(geometry.total_area(shapes), 3))
+print(su.shout("modules work"), su.title("hello tern world"), su.shapes_seen)
+
+# a class from another module can be subclassed
+class Square < geometry.Rect {
+    fn init(side) { super.init(side, side) }
+}
+print(Square(4).describe(), isinstance(Square(1), geometry.Shape))

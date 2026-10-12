@@ -1,0 +1,62 @@
+# A JSON-like pretty printer written entirely in Tern.
+# Handles nested dicts/lists, strings with escapes, numbers, booleans, null.
+
+fn escape(s) {
+    let out = []
+    for c in s {
+        if c == "\"" { out.push("\\\"") }
+        else if c == "\\" { out.push("\\\\") }
+        else if c == "\n" { out.push("\\n") }
+        else if c == "\t" { out.push("\\t") }
+        else { out.push(c) }
+    }
+    return "\"" + "".join(out) + "\""
+}
+
+fn pretty(value, indent_size) {
+    fn render(v, depth) {
+        let pad = " ".repeat(indent_size * (depth + 1))
+        let close_pad = " ".repeat(indent_size * depth)
+        let t = type(v)
+        if t == "dict" {
+            if len(v) == 0 { return "{}" }
+            let parts = []
+            for k in sorted(v.keys()) {
+                parts.push(pad + escape(str(k)) + ": " + render(v[k], depth + 1))
+            }
+            return "{\n" + ",\n".join(parts) + "\n" + close_pad + "}"
+        }
+        if t == "list" {
+            if len(v) == 0 { return "[]" }
+            # short lists of scalars stay on one line
+            let simple = filter(fn(x) => type(x) != "list" and type(x) != "dict", v)
+            if len(simple) == len(v) and len(v) <= 4 {
+                return "[" + ", ".join(map(fn(x) => render(x, depth), v)) + "]"
+            }
+            let parts = map(fn(x) => pad + render(x, depth + 1), v)
+            return "[\n" + ",\n".join(parts) + "\n" + close_pad + "]"
+        }
+        if t == "string" { return escape(v) }
+        if t == "null" { return "null" }
+        if t == "bool" or t == "int" or t == "float" { return str(v) }
+        throw TypeError("cannot serialize value of type " + t)
+    }
+    return render(value, 0)
+}
+
+let doc = {
+    name: "Tern",
+    version: 1.0,
+    stable: true,
+    license: null,
+    features: ["closures", "classes", "exceptions", "modules", "a VM"],
+    authors: [{name: "Ada", langs: ["tern", "python"]}, {name: "Lin \"the\" Dev", langs: []}],
+    limits: {max_frames: 200000, empty: {}},
+    path: "C:\\tern\\bin",
+    multiline: "line1\nline2",
+}
+
+print(pretty(doc, 2))
+print(pretty([1, [2, [3, [4]]]], 4))
+
+try { pretty({f: print}, 2) } catch e { print("error:", e.message) }

@@ -1,0 +1,37 @@
+# Recursive Fibonacci, memoized with a closure.
+#
+# `memoize` returns a new function that owns a private cache dictionary.
+# The cache lives in a captured variable: it outlives the call to memoize
+# because the returned closure holds on to it (a closed upvalue).
+
+fn memoize(f) {
+    let cache = {}
+    let hits = 0
+    fn wrapped(n) {
+        if cache.has(n) {
+            hits += 1
+            return cache[n]
+        }
+        let result = f(n)
+        cache[n] = result
+        return result
+    }
+    fn stats() { return {cached: len(cache), hits: hits} }
+    return [wrapped, stats]
+}
+
+let pair = memoize(fn(n) {
+    if n < 2 { return n }
+    return fib(n - 1) + fib(n - 2)    # calls the memoized global `fib`
+})
+let fib = pair[0]
+let stats = pair[1]
+
+for n in [10, 20, 50, 90] {
+    print("fib(" + str(n) + ") =", fib(n))
+}
+print("cache stats:", stats())
+
+# Naive version for comparison: exponential time, so keep n small.
+fn slow_fib(n) { if n < 2 { return n } return slow_fib(n - 1) + slow_fib(n - 2) }
+print("slow_fib(20) =", slow_fib(20))

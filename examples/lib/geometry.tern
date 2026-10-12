@@ -1,0 +1,20 @@
+# A small module: top-level declarations become the module's exports.
+let PI = 3.141592653589793
+
+class Shape {
+    fn area() { return 0 }
+    fn describe() { return type(self) + " with area " + str(round(self.area(), 2)) }
+}
+
+class Circle < Shape {
+    fn init(r) { self.r = r }
+    fn area() { return PI * self.r ** 2 }
+}
+
+class Rect < Shape {
+    fn init(w, h) { self.w = w
+                    self.h = h }
+    fn area() { return self.w * self.h }
+}
+
+fn total_area(shapes) { return reduce(fn(acc, s) => acc + s.area(), shapes, 0) }

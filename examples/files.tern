@@ -1,0 +1,9 @@
+# File I/O: write, append, read back, and handle a missing file.
+let path = "tern_demo_output.txt"
+write_file(path, "first line\n")
+append_file(path, "second line\n")
+let lines = read_file(path).strip().split("\n")
+print("read", len(lines), "lines:", lines)
+delete_file(path)
+print("exists after delete?", file_exists(path))
+try { read_file("does/not/exist.txt") } catch e { print(type(e), "-", e.message) }
