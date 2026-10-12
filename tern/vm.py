@@ -47,7 +47,9 @@ INHERIT = O.INHERIT; METHOD = O.METHOD; BUILD_LIST = O.BUILD_LIST; BUILD_DICT = 
 SETUP_TRY = O.SETUP_TRY; POP_TRY = O.POP_TRY; THROW = O.THROW; IMPORT = O.IMPORT
 GET_LOCAL2 = O.GET_LOCAL2; STORE_LOCAL = O.STORE_LOCAL; STORE_GLOBAL = O.STORE_GLOBAL
 ADD_CONST = O.ADD_CONST; SUB_CONST = O.SUB_CONST; CMP_JUMP_IF_FALSE = O.CMP_JUMP_IF_FALSE
-RETURN_LOCAL = O.RETURN_LOCAL
+RETURN_LOCAL = O.RETURN_LOCAL; LOCAL_ADD_CONST = O.LOCAL_ADD_CONST
+LOCAL_SUB_CONST = O.LOCAL_SUB_CONST; INCR_LOCAL = O.INCR_LOCAL
+LOCAL_CONST_CMP_JUMP = O.LOCAL_CONST_CMP_JUMP; LOCAL2_CMP_JUMP = O.LOCAL2_CMP_JUMP
 
 _MISSING = object()
 _DONE = object()
@@ -486,12 +488,34 @@ class VM:
                 while True:
                     o = code[ip]
                     ip += 1
+                    # Dispatch order matters: each failed `elif` costs ~15ns, so
+                    # the hottest instructions (incl. superinstructions) go first.
                     if o == GET_LOCAL:
                         push(stack[base + code[ip]])
                         ip += 1
-                    elif o == CONST:
-                        push(consts[code[ip]])
-                        ip += 1
+                    elif o == LOCAL_CONST_CMP_JUMP:
+                        a = stack[base + code[ip]]
+                        b = consts[code[ip + 1]]
+                        cmp = code[ip + 2]
+                        if type(a) is int and type(b) is int:
+                            if cmp == LT:
+                                r = a < b
+                            elif cmp == GT:
+                                r = a > b
+                            elif cmp == LE:
+                                r = a <= b
+                            elif cmp == GE:
+                                r = a >= b
+                            elif cmp == EQ:
+                                r = a == b
+                            else:
+                                r = a != b
+                        else:
+                            r = compare_op(cmp, a, b)
+                        if r:
+                            ip += 4
+                        else:
+                            ip = code[ip + 3]
                     elif o == GET_GLOBAL:
                         name = consts[code[ip]]
                         ip += 1
@@ -529,6 +553,30 @@ class VM:
                                 base = frame.base
                                 upvals = frame.upvalues
                                 globals_ = frame.globals
+                    elif o == LOCAL_SUB_CONST:
+                        a = stack[base + code[ip]]
+                        b = consts[code[ip + 1]]
+                        ip += 2
+                        if type(a) is int and type(b) is int:
+                            push(a - b)
+                        else:
+                            push(binary_op(SUB, a, b))
+                    elif o == RETURN_LOCAL:
+                        result = stack[base + code[ip]]
+                        if self.open_upvalues:
+                            self.close_upvalues(base)
+                        del stack[base:]
+                        frames.pop()
+                        if len(frames) == stop_depth:
+                            return result
+                        push(result)
+                        frame = frames[-1]
+                        code = frame.code
+                        consts = frame.consts
+                        ip = frame.ip
+                        base = frame.base
+                        upvals = frame.upvalues
+                        globals_ = frame.globals
                     elif o == RETURN:
                         result = pop()
                         if self.open_upvalues:
@@ -545,6 +593,49 @@ class VM:
                         base = frame.base
                         upvals = frame.upvalues
                         globals_ = frame.globals
+                    elif o == CONST:
+                        push(consts[code[ip]])
+                        ip += 1
+                    elif o == INCR_LOCAL:
+                        i = base + code[ip]
+                        a = stack[i]
+                        b = consts[code[ip + 1]]
+                        ip += 2
+                        if type(a) is int and type(b) is int:
+                            stack[i] = a + b
+                        else:
+                            stack[i] = binary_op(ADD, a, b)
+                    elif o == LOCAL2_CMP_JUMP:
+                        a = stack[base + code[ip]]
+                        b = stack[base + code[ip + 1]]
+                        cmp = code[ip + 2]
+                        if type(a) is int and type(b) is int:
+                            if cmp == LT:
+                                r = a < b
+                            elif cmp == GT:
+                                r = a > b
+                            elif cmp == LE:
+                                r = a <= b
+                            elif cmp == GE:
+                                r = a >= b
+                            elif cmp == EQ:
+                                r = a == b
+                            else:
+                                r = a != b
+                        else:
+                            r = compare_op(cmp, a, b)
+                        if r:
+                            ip += 4
+                        else:
+                            ip = code[ip + 3]
+                    elif o == LOCAL_ADD_CONST:
+                        a = stack[base + code[ip]]
+                        b = consts[code[ip + 1]]
+                        ip += 2
+                        if type(a) is int and type(b) is int:
+                            push(a + b)
+                        else:
+                            push(binary_op(ADD, a, b))
                     elif o == GET_LOCAL2:
                         push(stack[base + code[ip]])
                         push(stack[base + code[ip + 1]])
@@ -602,22 +693,6 @@ class VM:
                             ip += 2
                         else:
                             ip = code[ip + 1]
-                    elif o == RETURN_LOCAL:
-                        result = stack[base + code[ip]]
-                        if self.open_upvalues:
-                            self.close_upvalues(base)
-                        del stack[base:]
-                        frames.pop()
-                        if len(frames) == stop_depth:
-                            return result
-                        push(result)
-                        frame = frames[-1]
-                        code = frame.code
-                        consts = frame.consts
-                        ip = frame.ip
-                        base = frame.base
-                        upvals = frame.upvalues
-                        globals_ = frame.globals
                     elif o == LT:
                         b = pop()
                         a = stack[-1]

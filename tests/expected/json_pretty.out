@@ -1,0 +1,40 @@
+{
+  "authors": [
+    {
+      "langs": ["tern", "python"],
+      "name": "Ada"
+    },
+    {
+      "langs": [],
+      "name": "Lin \"the\" Dev"
+    }
+  ],
+  "features": [
+    "closures",
+    "classes",
+    "exceptions",
+    "modules",
+    "a VM"
+  ],
+  "license": null,
+  "limits": {
+    "empty": {},
+    "max_frames": 200000
+  },
+  "multiline": "line1\nline2",
+  "name": "Tern",
+  "path": "C:\\tern\\bin",
+  "stable": true,
+  "version": 1.0
+}
+[
+    1,
+    [
+        2,
+        [
+            3,
+            [4]
+        ]
+    ]
+]
+error: cannot serialize value of type function

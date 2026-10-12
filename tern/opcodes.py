@@ -100,6 +100,11 @@ _def("ADD_CONST", "const")          # CONST k + ADD
 _def("SUB_CONST", "const")          # CONST k + SUB
 _def("CMP_JUMP_IF_FALSE", "binop", "jump")  # LT/LE/GT/GE/EQ/NE + JUMP_IF_FALSE
 _def("RETURN_LOCAL", "slot")        # GET_LOCAL + RETURN
+_def("LOCAL_ADD_CONST", "slot", "const")   # GET_LOCAL s + ADD_CONST k
+_def("LOCAL_SUB_CONST", "slot", "const")   # GET_LOCAL s + SUB_CONST k
+_def("INCR_LOCAL", "slot", "const")        # LOCAL_ADD_CONST s k + STORE_LOCAL s
+_def("LOCAL_CONST_CMP_JUMP", "slot", "const", "binop", "jump")  # GET_LOCAL, CONST, CMP_JUMP_IF_FALSE
+_def("LOCAL2_CMP_JUMP", "slot", "slot", "binop", "jump")         # GET_LOCAL2 + CMP_JUMP_IF_FALSE
 
 JUMP_OPS = {code for code, ops in OPERANDS.items() if "jump" in ops}
 BINARY_OPS = {ADD: "+", SUB: "-", MUL: "*", DIV: "/", FLOORDIV: "//", MOD: "%",

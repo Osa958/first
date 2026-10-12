@@ -501,6 +501,13 @@ class TestCollections(TernTestCase):
             print(d["nested"].len(), d["tags"][1])
         """, "1 b\n")
 
+    def test_bool_key_rejected(self):
+        self.check_error('let d = {1: "int", true: "bool"}', "TypeError", "bool cannot be used as a dictionary key")
+
+    def test_instances_as_keys_by_identity(self):
+        self.check("class K {}\nlet a = K()\nlet b = K()\nlet d = {}\nd[a] = 1\nd[b] = 2\nprint(d[a], d[b], len(d))",
+                   "1 2 2\n")
+
     def test_missing_key(self):
         self.check_error('let d = {}\nd["x"]', "KeyError", 'key "x" not found')
 

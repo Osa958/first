@@ -14,6 +14,11 @@ Passes (repeated until nothing changes):
                         <compare>, JUMP_IF_FALSE L ->  CMP_JUMP_IF_FALSE cmp L
                         NOT, JUMP_IF_FALSE L       ->  JUMP_IF_TRUE L
                         GET_LOCAL s, RETURN        ->  RETURN_LOCAL s
+                        GET_LOCAL s, ADD_CONST k   ->  LOCAL_ADD_CONST s k  (also SUB)
+                        LOCAL_ADD_CONST s k, STORE_LOCAL s -> INCR_LOCAL s k
+                        GET_LOCAL s, CONST k, CMP_JUMP_IF_FALSE c L
+                                                   ->  LOCAL_CONST_CMP_JUMP s k c L
+                        GET_LOCAL2 a b, CMP_JUMP_IF_FALSE c L -> LOCAL2_CMP_JUMP a b c L
   * jump threading:     JUMP L where L: JUMP M     ->  JUMP M
   * dead code removal:  instructions after JUMP/RETURN/THROW up to the next label
 """
@@ -49,6 +54,14 @@ def _try_fold(opcode, a, b):
 
 
 def optimize(items, consts, add_const):
+    # Phase 1 folds constants to a fixpoint; phase 2 builds superinstructions.
+    # (Fusing first would hide folding opportunities, e.g. CONST, ADD -> ADD_CONST.)
+    for fuse in (False, True):
+        items = _run_passes(items, consts, add_const, fuse)
+    return items
+
+
+def _run_passes(items, consts, add_const, fuse):
     from .compiler import Instr, Label
 
     def is_instr(x):
@@ -124,8 +137,35 @@ def optimize(items, consts, add_const):
                     i += 2
                     changed = True
                     continue
+                if not fuse:
+                    out.append(a)
+                    i += 1
+                    continue
+                # operand-specialized superinstructions (3-wide)
+                if (a.op == op.GET_LOCAL and b.op == op.CONST and is_instr(c)
+                        and c.op == op.CMP_JUMP_IF_FALSE and _is_num(consts[b.args[0]])):
+                    out.append(Instr(op.LOCAL_CONST_CMP_JUMP,
+                                     [a.args[0], b.args[0], c.args[0], c.args[1]], c.pos))
+                    i += 3
+                    changed = True
+                    continue
                 fused = None
-                if a.op == op.GET_LOCAL and b.op == op.GET_LOCAL:
+                d = items[i + 3] if i + 3 < n else None
+                if (a.op == op.GET_LOCAL and b.op == op.GET_LOCAL and is_instr(c)
+                        and (c.op in (op.ADD_CONST, op.SUB_CONST) or
+                             (c.op == op.CONST and is_instr(d) and
+                              (d.op == op.CMP_JUMP_IF_FALSE or d.op in op.COMPARE_OPS)))):
+                    pass    # let b fuse with c instead (more profitable than GET_LOCAL2)
+                elif a.op == op.GET_LOCAL and b.op == op.ADD_CONST:
+                    fused = Instr(op.LOCAL_ADD_CONST, [a.args[0], b.args[0]], b.pos)
+                elif a.op == op.GET_LOCAL and b.op == op.SUB_CONST:
+                    fused = Instr(op.LOCAL_SUB_CONST, [a.args[0], b.args[0]], b.pos)
+                elif (a.op == op.LOCAL_ADD_CONST and b.op == op.STORE_LOCAL
+                        and a.args[0] == b.args[0]):
+                    fused = Instr(op.INCR_LOCAL, a.args, a.pos)
+                elif a.op == op.GET_LOCAL2 and b.op == op.CMP_JUMP_IF_FALSE:
+                    fused = Instr(op.LOCAL2_CMP_JUMP, a.args + b.args, b.pos)
+                elif a.op == op.GET_LOCAL and b.op == op.GET_LOCAL:
                     fused = Instr(op.GET_LOCAL2, [a.args[0], b.args[0]], b.pos)
                 elif a.op == op.SET_LOCAL and b.op == op.POP:
                     fused = Instr(op.STORE_LOCAL, a.args, a.pos)

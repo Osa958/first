@@ -1,0 +1,11 @@
+transferred 30 from alice to bob
+transferred 170 from bob to carol
+transferred 1 from bob to carol
+interest paid to alice: 3.5
+Savings[alice: 73.5]
+Checking[bob: -91]
+Premium[carol: -329]
+total: -346.5
+carol history: ["deposit 170", "deposit 1", "withdraw 500", "premium audit"]
+ValueError: deposit must be positive
+is carol a Checking? true a Savings? false

@@ -269,4 +269,8 @@ def check_hashable(key):
     t = type(key)
     if t is list or t is dict:
         raise RuntimeFault("TypeError", "%s cannot be used as a dictionary key" % type_name(key))
+    if t is bool:
+        # Python would merge true/1 and false/0 into one key, but in Tern
+        # 1 != true, so bool keys are rejected rather than silently colliding.
+        raise RuntimeFault("TypeError", "bool cannot be used as a dictionary key")
     return key
